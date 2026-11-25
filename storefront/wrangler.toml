@@ -1,0 +1,35 @@
+name = "web3-ops-automation-pack-store"
+main = "src/index.ts"
+compatibility_date = "2025-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+[[kv_namespaces]]
+binding = "LICENSES_KV"
+id = "da54ffd8136a40888815333c152915f5"
+
+[[kv_namespaces]]
+binding = "GLOBAL_CLAIMED_TX_KV"
+id = "1ff457c56d7b4ddfb78e727fd6b4725b"
+
+[vars]
+BRAND_NAME = "ApexHive Labs"
+PRODUCT_ID = "web3-ops-automation-pack"
+PACK_VERSION = "1.0.0"
+LICENSE_SIGNING_PUBLIC_SPKI_B64 = "MCowBQYDK2VwAyEAv48wDdS0fRT6BsatuDkoNF/bYrhUSIQIxuBh/l26ahQ="
+ASSET_SHA256 = "6cb37684de397fca9674862fe76d868ded46983c4aa3cead49eb90309643dc4b"
+PAY_TO_EVM_ADDRESS = "0x32eceaC45DBED9E555dAb80346aBd4Ab9C676206"
+BASE_USDC_CONTRACT = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+BASE_CHAIN_ID = "8453"
+BASE_RPC_URLS = "https://mainnet.base.org,https://base-rpc.publicnode.com,https://1rpc.io/base"
+SUPPORTER_PRICE_USDC_ATOMIC = "5000000"
+TEAM_PRICE_USDC_ATOMIC = "49000000"
+MIN_CONFIRMATIONS = "2"
+SOLANA_RECEIVE_ADDRESS = "4UyTxvrcqtYEsm5LQuiD5ofEJ4bMk6XJqv6G4St3GC9F"
+BTC_RECEIVE_ADDRESS = "bc1q2j0yqtn2cyslurxvx050vpgnamdqhxtegfs789"
+TRON_RECEIVE_ADDRESS = "TFVqcqQuGKsjwb6tFnhLyL3UudPdA6VnnN"
+PUBLIC_GITHUB_REPO_URL = "https://github.com/apexhive-hq/web3-ops-automation-pack"
+GITHUB_RELEASE_ASSET_URL = "https://api.github.com/repos/apexhive-hq/web3-ops-automation-pack/releases/assets/789508203"

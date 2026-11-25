@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "types": ["node"]
+  },
+  "include": [
+    "base-usdc-watcher/src/**/*.ts",
+    "solana-usdc-verifier/src/**/*.ts",
+    "playwright-crypto-qa/src/**/*.ts"
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "name": "Solana Pay USDC Reference Invoice Matcher",
+  "nodes": [
+    {
+      "id": "sol-webhook",
+      "name": "Solana Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "solana-usdc-invoice",
+        "responseMode": "onReceived"
+      }
+    },
+    {
+      "id": "match-spl",
+      "name": "Match SPL USDC Mint & Reference",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [520, 300],
+      "parameters": {
+        "jsCode": "const SOL_USDC = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';\nconst VAULT = $env.SOLANA_RECEIVE_ADDRESS || '';\nreturn items.filter(({ json }) => {\n  const transfers = json.tokenTransfers || [];\n  return !json.transactionError && transfers.some(t => t.mint === SOL_USDC && t.toUserAccount === VAULT && Number(t.tokenAmount) >= 19);\n});"
+      }
+    },
+    {
+      "id": "fulfill-hook",
+      "name": "Dispatch Fulfillment Webhook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [800, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.FULFILLMENT_WEBHOOK_URL}}",
+        "sendBody": true,
+        "jsonBody": "={{ { event: 'solana_usdc_settled', signature: $json.signature } }}"
+      }
+    }
+  ],
+  "connections": {
+    "Solana Webhook Trigger": {
+      "main": [[{ "node": "Match SPL USDC Mint & Reference", "type": "main", "index": 0 }]]
+    },
+    "Match SPL USDC Mint & Reference": {
+      "main": [[{ "node": "Dispatch Fulfillment Webhook", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" }
+}

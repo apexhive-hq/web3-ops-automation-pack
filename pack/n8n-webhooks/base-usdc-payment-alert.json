@@ -1,0 +1,49 @@
+{
+  "name": "Base USDC Payment Alert & Webhook Verifier",
+  "nodes": [
+    {
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "base-usdc-payment",
+        "responseMode": "onReceived"
+      }
+    },
+    {
+      "id": "filter-usdc",
+      "name": "Verify Canonical Base USDC",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300],
+      "parameters": {
+        "jsCode": "const BASE_USDC = '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913';\nconst PAY_TO = ($env.PAY_TO_EVM_ADDRESS || '').toLowerCase();\nreturn items.filter(({ json }) => {\n  const contract = String(json.rawContract?.address || '').toLowerCase();\n  const to = String(json.toAddress || '').toLowerCase();\n  const amount = BigInt(json.valueAtomic || '0');\n  return contract === BASE_USDC && to === PAY_TO && amount >= 19000000n;\n});"
+      }
+    },
+    {
+      "id": "notify-ops",
+      "name": "Post Verified Ops Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [760, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.OPS_ALERT_WEBHOOK_URL}}",
+        "sendBody": true,
+        "jsonBody": "={{ { event: 'base_usdc_confirmed', txHash: $json.hash, amountAtomic: $json.valueAtomic } }}"
+      }
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [[{ "node": "Verify Canonical Base USDC", "type": "main", "index": 0 }]]
+    },
+    "Verify Canonical Base USDC": {
+      "main": [[{ "node": "Post Verified Ops Alert", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" }
+}

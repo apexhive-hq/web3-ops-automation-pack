@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.wrangler/
+.wrangler-state/
+.dev.vars
+.tmp-*
+__pycache__/
+.venv/
+*.pyc
+*.sqlite*
