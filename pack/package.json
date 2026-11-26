@@ -1,6 +1,6 @@
 {
-  "name": "@apexhive-labs/web3-ops-automation-pack",
-  "version": "1.0.0",
+  "name": "web3-ops-automation-pack",
+  "version": "1.0.1",
   "license": "MIT",
   "description": "Standalone TypeScript & Python 3.12 Web3 ops utilities: Base USDC watcher, Solana USDC verifier, Playwright crypto QA harness, and n8n webhook templates.",
   "private": true,
@@ -8,7 +8,7 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --test base-usdc-watcher/tests/*.test.mjs solana-usdc-verifier/tests/*.test.mjs playwright-crypto-qa/tests/*.test.mjs n8n-webhooks/tests/*.test.mjs",
-    "test:python": "python -m unittest discover -s base-usdc-watcher/python -p \"test_*.py\" && python -m unittest discover -s solana-usdc-verifier/python -p \"test_*.py\"",
+    "test:python": "node -e \"import('node:child_process').then(({execFileSync})=>{let py;for(const b of ['python3','python']){try{execFileSync(b,['-c','import sys'],{stdio:'ignore'});py=b;break}catch{}}if(!py)process.exit(1);execFileSync(py,['-m','unittest','discover','-s','base-usdc-watcher/python','-p','test_*.py'],{stdio:'inherit'});execFileSync(py,['-m','unittest','discover','-s','solana-usdc-verifier/python','-p','test_*.py'],{stdio:'inherit'})})\"",
     "bundle": "node scripts/build-zip.mjs"
   },
   "devDependencies": {

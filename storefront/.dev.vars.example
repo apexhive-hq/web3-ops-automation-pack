@@ -1,8 +1,0 @@
-# Local-only secrets for wrangler dev (never commit .dev.vars)
-LICENSE_SIGNING_PRIVATE_JWK=
-LICENSE_SIGNING_PUBLIC_SPKI_B64=
-DOWNLOAD_HMAC_SECRET=
-GITHUB_RELEASE_TOKEN=
-ASSET_SHA256=
-BASE_RPC_URLS=http://127.0.0.1:4151
-GITHUB_RELEASE_ASSET_URL=http://127.0.0.1:4152/releases/web3-ops-automation-pack-v1.0.0.zip
