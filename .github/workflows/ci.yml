@@ -9,6 +9,9 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: ['22', '24']
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -16,16 +19,20 @@ jobs:
           version: 10
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: ${{ matrix.node-version }}
           cache: 'pnpm'
           cache-dependency-path: pack/pnpm-lock.yaml
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install, Typecheck & Test
+      - name: Install Dependencies & Chromium
         working-directory: pack
         run: |
           pnpm install --frozen-lockfile --ignore-scripts
+          pnpm exec playwright install --with-deps chromium
+      - name: Typecheck, Test & Bundle
+        working-directory: pack
+        run: |
           pnpm run typecheck
           pnpm test
           pnpm run test:python

@@ -17,12 +17,15 @@ function resolvePythonBin() {
 
 const PYTHON_BIN = resolvePythonBin();
 const PACK_DIR = resolve(process.cwd());
+const PKG = JSON.parse(readFileSync(join(PACK_DIR, 'package.json'), 'utf8'));
+const VERSION = PKG.version;
 const PRODUCT_DIR = resolve(PACK_DIR, '..');
 const DIST_DIR = join(PRODUCT_DIR, 'dist');
 const STAGE_DIR = join(DIST_DIR, '_stage_pack');
 const UNPACK_DIR = join(DIST_DIR, '_verify_unpack');
-const ZIP_PATH = join(DIST_DIR, 'web3-ops-automation-pack-v1.0.0.zip');
-const SHA_PATH = join(DIST_DIR, 'web3-ops-automation-pack-v1.0.0.zip.sha256');
+const ZIP_NAME = `web3-ops-automation-pack-v${VERSION}.zip`;
+const ZIP_PATH = join(DIST_DIR, ZIP_NAME);
+const SHA_PATH = join(DIST_DIR, `${ZIP_NAME}.sha256`);
 
 rmSync(STAGE_DIR, { recursive: true, force: true });
 rmSync(UNPACK_DIR, { recursive: true, force: true });
@@ -71,7 +74,7 @@ execFileSync(
 
 const zipBytes = readFileSync(ZIP_PATH);
 const sha256 = createHash('sha256').update(zipBytes).digest('hex');
-writeFileSync(SHA_PATH, `${sha256}  web3-ops-automation-pack-v1.0.0.zip\n`, 'utf8');
+writeFileSync(SHA_PATH, `${sha256}  ${ZIP_NAME}\n`, 'utf8');
 
 // Clean-room unpack & test verification (no node_modules needed for pure Node/Python tests)
 execFileSync(

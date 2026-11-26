@@ -10,17 +10,20 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "base-usdc-payment",
-        "responseMode": "onReceived"
+        "responseMode": "lastNode",
+        "options": {
+          "rawBody": true
+        }
       }
     },
     {
       "id": "filter-usdc",
-      "name": "Verify Canonical Base USDC",
+      "name": "Verify HMAC & Base USDC On-Chain",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [500, 300],
+      "position": [520, 300],
       "parameters": {
-        "jsCode": "const BASE_USDC = '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913';\nconst PAY_TO = ($env.PAY_TO_EVM_ADDRESS || '').toLowerCase();\nreturn items.filter(({ json }) => {\n  const contract = String(json.rawContract?.address || '').toLowerCase();\n  const to = String(json.toAddress || '').toLowerCase();\n  const amount = BigInt(json.valueAtomic || '0');\n  return contract === BASE_USDC && to === PAY_TO && amount >= 19000000n;\n});"
+        "jsCode": "const BASE_USDC = '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913';\nconst TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';\nconst HEX_QTY_RE = /^0x[0-9a-fA-F]+$/;\nconst TOPIC_WORD_RE = /^0x[0-9a-fA-F]{64}$/;\n\nconst SECRET = String($env.WEBHOOK_HMAC_SECRET || '').trim();\nif (SECRET.length < 16) {\n  throw new Error('WEBHOOK_HMAC_SECRET (>= 16 chars) must be configured');\n}\nconst PAY_TO = String($env.PAY_TO_EVM_ADDRESS || '').trim().toLowerCase();\nif (!/^0x[0-9a-f]{40}$/.test(PAY_TO)) {\n  throw new Error('PAY_TO_EVM_ADDRESS must be a valid non-empty 0x EVM address');\n}\nconst EXPECTED_RAW = String($env.EXPECTED_AMOUNT_ATOMIC || '').trim();\nif (!/^[1-9][0-9]*$/.test(EXPECTED_RAW)) {\n  throw new Error('EXPECTED_AMOUNT_ATOMIC must be a positive integer string');\n}\nconst EXPECTED_AMOUNT_ATOMIC = BigInt(EXPECTED_RAW);\nconst BASE_RPC_URL = String($env.BASE_RPC_URL || '').trim();\nif (!/^https?:\\/\\//i.test(BASE_RPC_URL)) {\n  throw new Error('BASE_RPC_URL must be configured');\n}\nconst MIN_CONF_RAW = String($env.MIN_CONFIRMATIONS || '2').trim();\nif (!/^[1-9][0-9]*$/.test(MIN_CONF_RAW)) {\n  throw new Error('MIN_CONFIRMATIONS must be a positive integer >= 1');\n}\nconst MIN_CONFIRMATIONS = BigInt(MIN_CONF_RAW);\nconst MAX_AGE_RAW = String($env.MAX_WEBHOOK_AGE_SECONDS || '300').trim();\nif (!/^[1-9][0-9]*$/.test(MAX_AGE_RAW)) {\n  throw new Error('MAX_WEBHOOK_AGE_SECONDS must be a positive integer');\n}\nconst MAX_WEBHOOK_AGE_SECONDS = Number(MAX_AGE_RAW);\n\nfunction parseStrictHexBigInt(val, label) {\n  if (typeof val !== 'string' || !HEX_QTY_RE.test(val.trim())) {\n    throw new Error(`Invalid ${label} hex quantity`);\n  }\n  return BigInt(val.trim());\n}\n\nfunction extractRawPayload(item) {\n  const binData = item?.binary?.data?.data;\n  if (typeof binData === 'string' && binData.length > 0) {\n    return Buffer.from(binData, 'base64').toString('utf8');\n  }\n  if (binData instanceof Uint8Array && binData.length > 0) {\n    return Buffer.from(binData).toString('utf8');\n  }\n  if (typeof item?.json?.rawBody === 'string' && item.json.rawBody.length > 0) {\n    return item.json.rawBody;\n  }\n  if (item?.json?.body !== undefined) {\n    return JSON.stringify(item.json.body);\n  }\n  return '';\n}\n\nasync function verifySignedWebhook(secret, tsHeader, rawPayload, sigHeader) {\n  const cleanTs = String(tsHeader || '').trim();\n  if (!/^\\d{10}$/.test(cleanTs)) {\n    throw new Error('Unauthorized: missing or invalid x-webhook-timestamp (Unix seconds required)');\n  }\n  const nowSec = Math.floor(Date.now() / 1000);\n  if (Math.abs(nowSec - Number(cleanTs)) > MAX_WEBHOOK_AGE_SECONDS) {\n    throw new Error('Unauthorized: webhook timestamp outside allowed replay window');\n  }\n  const cleanSig = String(sigHeader || '').trim().replace(/^sha256=/i, '').toLowerCase();\n  if (!/^[0-9a-f]{64}$/.test(cleanSig)) {\n    throw new Error('Unauthorized: missing or malformed webhook HMAC signature');\n  }\n  const enc = new TextEncoder();\n  const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);\n  const mac = new Uint8Array(await crypto.subtle.sign('HMAC', key, enc.encode(`${cleanTs}.${rawPayload}`)));\n  let diff = 0;\n  for (let i = 0; i < 32; i++) {\n    const byte = Number.parseInt(cleanSig.slice(i * 2, i * 2 + 2), 16);\n    diff |= mac[i] ^ byte;\n  }\n  if (diff !== 0) {\n    throw new Error('Unauthorized: invalid webhook HMAC signature');\n  }\n}\n\nasync function rpcCall(method, params) {\n  const res = await fetch(BASE_RPC_URL, {\n    method: 'POST',\n    headers: { 'content-type': 'application/json' },\n    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),\n    signal: AbortSignal.timeout(10000)\n  });\n  if (!res.ok) throw new Error(`Base RPC HTTP ${res.status}`);\n  const body = await res.json();\n  if (body.error) throw new Error(body.error.message || 'Base RPC error');\n  return body.result;\n}\n\nconst staticData = typeof $getWorkflowStaticData === 'function' ? $getWorkflowStaticData('global') : null;\nif (staticData && !Array.isArray(staticData.seenReplayKeys)) {\n  staticData.seenReplayKeys = [];\n}\n\nconst inputItems = typeof $input !== 'undefined' ? $input.all() : items;\nconst verified = [];\n\nfor (const item of inputItems) {\n  const json = item.json || {};\n  const headers = {};\n  for (const [k, v] of Object.entries(json.headers || {})) {\n    headers[String(k).toLowerCase()] = String(v ?? '');\n  }\n  const rawPayload = extractRawPayload(item);\n  if (!rawPayload) {\n    throw new Error('Unauthorized: missing webhook payload body');\n  }\n  await verifySignedWebhook(\n    SECRET,\n    headers['x-webhook-timestamp'],\n    rawPayload,\n    headers['x-webhook-signature'] || headers['x-signature-256']\n  );\n\n  const payload = JSON.parse(rawPayload);\n  const txHash = String(payload?.txHash || payload?.hash || '').trim().toLowerCase();\n  if (!/^0x[0-9a-f]{64}$/.test(txHash)) continue;\n\n  const replayKey = `base:${txHash}`;\n  if (staticData && staticData.seenReplayKeys.includes(replayKey)) continue;\n\n  const receipt = await rpcCall('eth_getTransactionReceipt', [txHash]);\n  if (!receipt || typeof receipt.status !== 'string' || receipt.status.toLowerCase() !== '0x1') continue;\n  const txBlock = parseStrictHexBigInt(receipt.blockNumber, 'receipt.blockNumber');\n  const latestHex = await rpcCall('eth_blockNumber', []);\n  const latestBlock = parseStrictHexBigInt(latestHex, 'eth_blockNumber');\n  if (latestBlock < txBlock) continue;\n  const confirmations = latestBlock - txBlock + 1n;\n  if (confirmations < MIN_CONFIRMATIONS) continue;\n\n  let totalAtomic = 0n;\n  let matchCount = 0;\n  const senderSet = new Set();\n  for (const log of receipt.logs || []) {\n    if (String(log?.address || '').trim().toLowerCase() !== BASE_USDC) continue;\n    if (!Array.isArray(log.topics) || log.topics.length < 3) continue;\n    if (String(log.topics[0]).toLowerCase() !== TRANSFER_TOPIC) continue;\n    if (!TOPIC_WORD_RE.test(String(log.topics[1])) || !TOPIC_WORD_RE.test(String(log.topics[2]))) continue;\n    const from = `0x${String(log.topics[1]).slice(-40).toLowerCase()}`;\n    const to = `0x${String(log.topics[2]).slice(-40).toLowerCase()}`;\n    if (to !== PAY_TO) continue;\n    totalAtomic += parseStrictHexBigInt(log.data, 'log.data');\n    senderSet.add(from);\n    matchCount += 1;\n  }\n\n  if (matchCount > 0 && totalAtomic >= EXPECTED_AMOUNT_ATOMIC) {\n    if (staticData) {\n      staticData.seenReplayKeys.push(replayKey);\n      if (staticData.seenReplayKeys.length > 1000) {\n        staticData.seenReplayKeys.splice(0, staticData.seenReplayKeys.length - 1000);\n      }\n    }\n    const senders = Array.from(senderSet);\n    verified.push({\n      json: {\n        event: 'base_usdc_confirmed',\n        replayKey,\n        txHash,\n        from: senders.length === 1 ? senders[0] : null,\n        senders,\n        to: PAY_TO,\n        amountAtomic: totalAtomic.toString(),\n        confirmations: Number(confirmations),\n        blockNumber: Number(txBlock)\n      }\n    });\n  }\n}\n\nreturn verified;"
       }
     },
     {
@@ -28,20 +31,21 @@
       "name": "Post Verified Ops Alert",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [760, 300],
+      "position": [800, 300],
       "parameters": {
         "method": "POST",
         "url": "={{$env.OPS_ALERT_WEBHOOK_URL}}",
         "sendBody": true,
-        "jsonBody": "={{ { event: 'base_usdc_confirmed', txHash: $json.hash, amountAtomic: $json.valueAtomic } }}"
+        "specifyBody": "json",
+        "jsonBody": "={{ { event: $json.event, replayKey: $json.replayKey, txHash: $json.txHash, from: $json.from, senders: $json.senders, to: $json.to, amountAtomic: $json.amountAtomic, confirmations: $json.confirmations, blockNumber: $json.blockNumber } }}"
       }
     }
   ],
   "connections": {
     "Webhook Trigger": {
-      "main": [[{ "node": "Verify Canonical Base USDC", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Verify HMAC & Base USDC On-Chain", "type": "main", "index": 0 }]]
     },
-    "Verify Canonical Base USDC": {
+    "Verify HMAC & Base USDC On-Chain": {
       "main": [[{ "node": "Post Verified Ops Alert", "type": "main", "index": 0 }]]
     }
   },

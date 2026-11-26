@@ -2,9 +2,12 @@
   "name": "web3-ops-automation-pack",
   "version": "1.0.1",
   "license": "MIT",
-  "description": "Standalone TypeScript & Python 3.12 Web3 ops utilities: Base USDC watcher, Solana USDC verifier, Playwright crypto QA harness, and n8n webhook templates.",
+  "description": "Standalone TypeScript (Node.js >= 22.18 LTS) & Python 3.12+ Web3 ops utilities: Base USDC watcher, Solana USDC verifier, Playwright crypto QA harness, and HMAC-authenticated n8n webhook templates.",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --test base-usdc-watcher/tests/*.test.mjs solana-usdc-verifier/tests/*.test.mjs playwright-crypto-qa/tests/*.test.mjs n8n-webhooks/tests/*.test.mjs",
